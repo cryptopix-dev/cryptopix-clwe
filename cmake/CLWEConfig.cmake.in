@@ -1,0 +1,41 @@
+@PACKAGE_INIT@
+
+# CLWE CMake Configuration
+# This file is configured by CMake during installation
+
+set(CLWE_VERSION "@CLWE_VERSION@")
+set_and_check(CLWE_INCLUDE_DIR "@PACKAGE_CLWE_INCLUDE_DIR@")
+set_and_check(CLWE_LIBRARY_DIR "@PACKAGE_CLWE_LIBRARY_DIR@")
+
+# Find the library
+find_library(CLWE_LIBRARY
+    NAMES clwe clwe_avx
+    PATHS "${CLWE_LIBRARY_DIR}"
+    NO_DEFAULT_PATH
+)
+
+# Find OpenSSL dependency
+find_package(OpenSSL REQUIRED)
+
+# Set up imported target
+if(NOT TARGET CLWE::clwe)
+    add_library(CLWE::clwe UNKNOWN IMPORTED)
+    set_target_properties(CLWE::clwe PROPERTIES
+        IMPORTED_LOCATION "${CLWE_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CLWE_INCLUDE_DIR}"
+        INTERFACE_LINK_LIBRARIES "OpenSSL::Crypto"
+    )
+endif()
+
+# Check if all required components are found
+check_required_components(CLWE)
+
+# Provide legacy variables for backward compatibility
+set(CLWE_LIBRARIES CLWE::clwe)
+set(CLWE_INCLUDE_DIRS "${CLWE_INCLUDE_DIR}")
+set(CLWE_FOUND TRUE)
+
+# Display found information
+if(NOT CLWE_FIND_QUIETLY)
+    message(STATUS "Found CLWE: ${CLWE_VERSION} (${CLWE_LIBRARY})")
+endif()

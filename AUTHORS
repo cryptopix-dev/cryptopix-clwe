@@ -1,0 +1,26 @@
+# Cryptopix-CLWE Authors
+
+## Core Team
+
+- **Project Lead**: [Your Name] <your.email@example.com>
+- **Lead Developer**: [Developer Name] <dev.email@example.com>
+- **Cryptography Expert**: [Crypto Expert Name] <crypto.email@example.com>
+
+## Contributors
+
+- [Contributor Name] <contributor.email@example.com> - SIMD optimizations
+- [Contributor Name] <contributor.email@example.com> - Documentation
+- [Contributor Name] <contributor.email@example.com> - Testing
+
+## Acknowledgments
+
+This project builds upon research in lattice-based cryptography and color theory.
+Special thanks to the academic community and open-source contributors in the
+post-quantum cryptography space.
+
+## Contact
+
+For questions or contributions, please contact the maintainers at:
+- Email: contact@your-org.com
+- GitHub: https://github.com/your-org/cryptopix-clwe
+- Issues: https://github.com/your-org/cryptopix-clwe/issues

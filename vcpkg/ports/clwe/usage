@@ -1,0 +1,14 @@
+CLWE is a header-only library that can be used with CMake or directly.
+
+CMake:
+    find_package(CLWE CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE CLWE::clwe)
+
+Direct usage:
+    #include <clwe/clwe.hpp>
+    #include <clwe/color_kem.hpp>
+
+    int main() {
+        clwe::ColorKEM kem{clwe::CLWEParameters(128)};
+        // ... use the library
+    }

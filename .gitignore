@@ -1,0 +1,40 @@
+# Build directories
+build/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+
+# Compiled object files
+*.o
+*.obj
+
+# Executables
+demo_kem
+benchmark_color_kem_timing
+
+# Library files
+*.dylib
+*.so
+*.a
+
+# Package config files
+clwe.pc
+CLWEConfig.cmake
+CLWEConfigVersion.cmake
+
+# IDE files
+.vscode/
+
+# OS files
+.DS_Store
+
+# Temporary files
+*.tmp
+*.swp
+*.log
+
+# Release archives (regenerate on build)
+*.tar.gz

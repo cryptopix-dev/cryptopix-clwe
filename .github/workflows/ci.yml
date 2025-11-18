@@ -1,0 +1,268 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  release:
+    types: [ published ]
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux builds
+          - os: ubuntu-22.04
+            compiler: gcc
+            version: 11
+            cmake_gen: "Unix Makefiles"
+          - os: ubuntu-22.04
+            compiler: clang
+            version: 14
+            cmake_gen: "Unix Makefiles"
+
+          # macOS builds
+          - os: macos-13
+            compiler: clang
+            version: apple
+            cmake_gen: "Unix Makefiles"
+
+          # Windows builds
+          - os: windows-2022
+            compiler: msvc
+            version: 2022
+            cmake_gen: "Visual Studio 17 2022"
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+
+    # Linux dependencies
+    - name: Install Linux dependencies
+      if: runner.os == 'Linux'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build libssl-dev
+
+    # macOS dependencies
+    - name: Install macOS dependencies
+      if: runner.os == 'macOS'
+      run: |
+        brew install cmake ninja openssl
+
+    # Windows dependencies
+    - name: Install Windows dependencies
+      if: runner.os == 'Windows'
+      run: |
+        choco install cmake ninja
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        ./bootstrap-vcpkg.bat
+        ./vcpkg install openssl
+
+    - name: Configure CMake
+      run: |
+        mkdir build
+        cd build
+        cmake .. \
+          -G "${{ matrix.cmake_gen }}" \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_PYTHON_BINDINGS=OFF \
+          -DENABLE_TESTS=OFF \
+          -DENABLE_BENCHMARKS=ON \
+          ${{ runner.os == 'macOS' && '-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64' || '' }} \
+          ${{ runner.os == 'Windows' && '-DCMAKE_TOOLCHAIN_FILE=../vcpkg/scripts/buildsystems/vcpkg.cmake' || '' }}
+
+    - name: Build
+      run: |
+        cd build
+        cmake --build . --config Release --parallel
+
+    - name: Run benchmarks
+      run: |
+        cd build
+        ./benchmark_color_kem_timing --quick
+
+    - name: Run demo
+      run: |
+        cd build
+        ./demo_kem
+
+    - name: Test installation
+      run: |
+        cd build
+        ${{ runner.os == 'Windows' && 'cmake --build . --config Release --target install' || 'sudo make install' }}
+
+  package-managers:
+    name: Package Manager Integration
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.8'
+
+    # Test vcpkg integration
+    - name: Test vcpkg
+      run: |
+        git clone https://github.com/Microsoft/vcpkg.git
+        cd vcpkg
+        ./bootstrap-vcpkg.sh
+        ./vcpkg install openssl
+        # Note: CLWE port would need to be added to vcpkg registry
+
+    # Test Conan integration
+    - name: Test Conan
+      run: |
+        pip install conan
+        conan profile new default --detect
+        # Note: Conan recipe would need to be published to a registry
+
+    # Test pkg-config
+    - name: Test pkg-config
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake libssl-dev pkg-config
+        mkdir build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc)
+        sudo make install
+        pkg-config --exists clwe
+
+  cross-compilation:
+    name: Cross-Compilation
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up ARM64 cross-compilation
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+
+    - name: Create ARM64 toolchain
+      run: |
+        cat > toolchain.cmake << EOF
+        set(CMAKE_SYSTEM_NAME Linux)
+        set(CMAKE_SYSTEM_PROCESSOR aarch64)
+        set(CMAKE_C_COMPILER aarch64-linux-gnu-gcc)
+        set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
+        set(CMAKE_FIND_ROOT_PATH /usr/aarch64-linux-gnu)
+        set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+        set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+        set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+        EOF
+
+    - name: Cross-compile for ARM64
+      run: |
+        mkdir build && cd build
+        cmake .. \
+          -G Ninja \
+          -DCMAKE_TOOLCHAIN_FILE=../toolchain.cmake \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_PYTHON_BINDINGS=OFF \
+          -DENABLE_TESTS=OFF \
+          -DENABLE_BENCHMARKS=OFF
+        ninja
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build libssl-dev clang-tidy cppcheck
+
+    - name: Configure CMake with clang-tidy
+      run: |
+        mkdir build && cd build
+        cmake .. \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Debug \
+          -DCMAKE_CXX_CLANG_TIDY=clang-tidy \
+          -DBUILD_PYTHON_BINDINGS=OFF \
+          -DENABLE_TESTS=OFF \
+          -DENABLE_BENCHMARKS=OFF
+
+    - name: Build with clang-tidy
+      run: |
+        cd build
+        ninja 2>&1 | tee clang-tidy.log || true
+
+    - name: Run cppcheck
+      run: |
+        cppcheck --enable=all --std=c++17 --language=c++ \
+          --suppress=missingIncludeSystem \
+          --suppress=unusedFunction \
+          --suppress=unmatchedSuppression \
+          --inline-suppr \
+          --xml --xml-version=2 \
+          src/ 2> cppcheck.xml || true
+
+    - name: Upload code quality reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: code-quality-reports
+        path: |
+          build/clang-tidy.log
+          cppcheck.xml
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake ninja-build libssl-dev
+
+    - name: Build release
+      run: |
+        mkdir build && cd build
+        cmake .. \
+          -G Ninja \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DBUILD_PYTHON_BINDINGS=OFF \
+          -DENABLE_TESTS=OFF \
+          -DENABLE_BENCHMARKS=ON
+        ninja
+        ninja package
+
+    - name: Upload release assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ github.event.release.upload_url }}
+        asset_path: build/*.tar.gz
+        asset_name: cryptopix-clwe-${{ github.event.release.tag_name }}-linux-x64.tar.gz
+        asset_content_type: application/gzip

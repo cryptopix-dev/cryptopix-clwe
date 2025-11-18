@@ -1,0 +1,19 @@
+{
+  "name": "clwe",
+  "version": "1.0.0",
+  "description": "Cryptopix-CLWE: Color-Integrated Learning With Errors (CLWE) Cryptosystem - A high-performance, post-quantum cryptographic library",
+  "homepage": "https://github.com/your-org/cryptopix-clwe",
+  "license": "Apache-2.0",
+  "supports": "!uwp",
+  "dependencies": [
+    "openssl",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}
